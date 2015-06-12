@@ -9,7 +9,15 @@ import java.util.ArrayList;
 public class AnalsisLexico implements AnalsisLexicoConstants {
   static Tabla_simbolos tablaSim = new Tabla_simbolos();
 
+  static boolean destruccion = false;
+
+  static FileWriter fichero = null;
+
+  static PrintWriter pw = null;
+
   static int nivel;
+
+  static String programa;
 
   static int dir = 3;
 
@@ -33,20 +41,42 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
       tablaSim.inicializar_tabla();
       nivel = 0;
       parser.entrada();
-      System.out.println("Analisis terminado");
-      System.out.println("No se han encontrado errores");
+      System.out.println("Compilaci\u00f3n finalizada. Se ha generado el fichero <"+programa+">.code");
     }
     catch (Exception e)
     {
-      System.out.println("NOK.");
+      System.out.println("UHHPS.");
       System.out.println(e.getMessage());
-      e.printStackTrace();
+      //e.printStackTrace();      destruccion = true;
       AnalsisLexico.ReInit(System.in);
     }
     catch (Error e)
     {
+      destruccion = true;
       SimpleCharStream stream = parser.jj_input_stream;
       System.out.println("ERROR LEXICO (" + stream.getBeginLine() + "," + stream.getBeginColumn() + ") :simbolo no reconocido: " + stream.GetImage());
+    }
+    finally
+    {
+      destruye();
+    }
+  }
+
+  static void destruye()
+  {
+    try
+    {
+      fichero.close();
+    }
+    catch (IOException e)
+    {
+      // TODO Auto-generated catch block      e.printStackTrace();
+    }
+    if (destruccion)
+    {
+      System.out.println("Elimando fichero.code ......");
+      File ficheroB = new File(programa + ".code");
+      ficheroB.delete();
     }
   }
 
@@ -66,20 +96,21 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
 
   static void errorSemantico(String text)
   {
+    destruccion = true;
     System.out.println(text);
   }
 
   /** * Metodo auxiliar para  centralizar la escritura de codigo **/
   public static void generarCodigo(String text)
   {
-    System.out.println(text);
+    pw.println(text);
   }
 
   public static void generarCodigo(ArrayList < String > text)
   {
     for (int i = 0; i < text.size(); i++)
     {
-      System.out.println(text.get(i));
+      pw.println(text.get(i));
     }
   }
 
@@ -105,14 +136,27 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
   }
 
   /** * Inicializa la escritura en fichero externo **/
-  public static void inicializar_generacion_codigo()
-  {}
+  public static void inicializar_generacion_codigo(String programaNombre)
+  {
+    fichero = null;
+    pw = null;
+    try
+    {
+      fichero = new FileWriter(programaNombre + ".code");
+      programa = programaNombre;
+      pw = new PrintWriter(fichero);
+    }
+    catch (Exception e)
+    {
+      e.printStackTrace();
+    }
+  }
 
   /** * Genera una nueva etiqueta */
   public static String nueva_etiqueta()
   {
     etiqueta++;
-    return "L" + etiqueta + ":";
+    return "L" + etiqueta;
   }
 
   static final public Token entrada() throws ParseException {
@@ -130,21 +174,18 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
         break label_1;
       }
       jj_consume_token(tPROGRAMA);
+      tk = jj_consume_token(tIDENTIFICADOR);
+      inicializar_generacion_codigo(tk.image);
+      generarCodigo("; Programa " + tk.image);
       etiq = nueva_etiqueta();
       generarCodigo("ENP " + etiq);
-      tk = jj_consume_token(tIDENTIFICADOR);
+      generarCodigo("; Comienzo del programa " + tk.image);
       jj_consume_token(49);
       declaracion_variables();
       declaracion_acciones();
       generarCodigo(etiq);
       bloque_sentencias();
-      /*
-      generarCodigo(cacciones);
-      generarCodigo("; Comienzo de " + tk.image);
-      generarCodigo(etiq + ":");
-      generarCodigo(cbloqueinstr);
-      generarCodigo("; Fin de " + tk.image);   
-      */
+      generarCodigo("; Fin del programa " + tk.image);
       generarCodigo("LVP");
       jj_consume_token(tFINPROGRAMA);
       {if (true) return tk;}
@@ -194,16 +235,16 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
 
   static final public Token declaracion_accion() throws ParseException {
   Token tk = null;
-  String etiq;
-    cabecera_accion();
+  String etAcc;
+    etAcc = cabecera_accion();
     jj_consume_token(49);
     declaracion_variables();
     declaracion_acciones();
-      etiq = nueva_etiqueta();
-      generarCodigo(etiq);
+      generarCodigo(etAcc + ":");
     bloque_sentencias();
     tablaSim.eliminarNivel(nivel);
     nivel--;
+    generarCodigo("; Fin de la accion");
     generarCodigo("CSF");
     {if (true) return tk;}
     throw new Error("Missing return statement in function");
@@ -262,32 +303,45 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
     throw new Error("Missing return statement in function");
   }
 
-  static final public Token cabecera_accion() throws ParseException {
+  static final public String cabecera_accion() throws ParseException {
   Token tk = null;
   Simbolo s = null;
-  boolean ok = false;
   ArrayList < Simbolo > listadoparametros;
+  String etiq = "LE";
     jj_consume_token(tACCION);
     tk = jj_consume_token(tIDENTIFICADOR);
       s = tablaSim.buscar_simbolo(tk.image);
       if (s == null || s.getNivel() != nivel)
       {
         s = tablaSim.introducir_accion(tk.image, nivel, etiqueta + 1);
-        ok = true;
+        etiq = nueva_etiqueta();
       }
       else
       {
         errorSemantico("Accion duplicada [" + tk.beginLine + "," + tk.beginColumn + "] " + "Token: <" + tk.image + ">");
       }
       nivel++;
-      dir = INICIAL;
+      dir = 3;
       peso = 0;
+      generarCodigo("; Acci\u00f3n " + tk.image);
     listadoparametros = parametros_formales();
       if (s != null)
       {
         s.setListaParametros(listadoparametros);
+        if (listadoparametros.size() > 0)
+        {
+          generarCodigo(etiq);
+          for (int i = listadoparametros.size() - 1; i >= 0; i--)
+          {
+            generarCodigo("; Recuperaci\u00f3n del par\u00e1metro " + listadoparametros.get(i).getNombre());
+            generarCodigo("SRF 0 " + (i + 3));
+            generarCodigo("ASGI");
+          }
+          etiq = nueva_etiqueta();
+          generarCodigo("JMP " + etiq);
+        }
       }
-    {if (true) return tk;}
+    {if (true) return etiq;}
     throw new Error("Missing return statement in function");
   }
 
@@ -374,7 +428,8 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
       }
       else
       {
-        dir = dir + tamanio(tipo);
+        dir = dir + 1;
+        peso = peso + tamanio(tipo);
       }
     label_6:
     while (true) {
@@ -396,7 +451,8 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
         }
         else
         {
-          dir = dir + tamanio(tipo);
+          dir = dir + 1;
+          peso = peso + tamanio(tipo);
         }
     }
     {if (true) return lista;}
@@ -500,7 +556,12 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
             auxi.constante = false;
             s1.setFactor(auxi);
           }
+          generarCodigo("Leer");
           generarCodigo("SRF " + (nivel - s1.getNivel()) + " " + s1.getDir());
+          if (s1.getParametro() == clase_parametro.REF)
+          {
+            generarCodigo("DRF");
+          }
           if (s1.getVariable() == tipo_variable.ENTERO)
           {
             generarCodigo("RD 1");
@@ -556,8 +617,9 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
   static final public Token escribir(boolean estado) throws ParseException {
   Token tk = null;
     tk = jj_consume_token(tESCRIBIR);
+      generarCodigo("; Escribir");
     jj_consume_token(51);
-    lista_escribibles(tk,estado);
+    lista_escribibles(tk, estado);
     jj_consume_token(52);
     {if (true) return tk;}
     throw new Error("Missing return statement in function");
@@ -591,7 +653,12 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
         else if (expre.constante)
         {
           // SRF 0 s1.getDir()
+          generarCodigo("; Direcci\u00f3n de la variable " + s1.getNombre());
           generarCodigo("SRF " + (nivel - s1.getNivel()) + " " + s1.getDir());
+          if (s1.getParametro() == clase_parametro.REF)
+          {
+            generarCodigo("DRF");
+          }
           if (estado)
           {
             expre.constante = false;
@@ -618,16 +685,19 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
             generarCodigo("STC " + (int) expre.valorChar);
           }
           //ASG
+          generarCodigo("; Asignaci\u00f3n");
           generarCodigo("ASG");
         }
         else
         {
           s1.setFactor(expre);
           // SRF 0 s1.getDir()
+          generarCodigo("; Direcci\u00f3n de la variable " + s1.getNombre());
           generarCodigo("SRF " + (nivel - s1.getNivel()) + " " + s1.getDir());
           //expre.listado
           generarCodigo(expre.listado);
           //ASG
+          generarCodigo("; Asignaci\u00f3n");
           generarCodigo("ASG");
         }
         break;
@@ -663,6 +733,7 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
           }
           else
           {
+            generarCodigo("; Apilar parametros de Accion " + s1.getNombre());
             for (int i = 0; i < lista.size(); i++)
             {
               if (lista.get(i).tipo != s1.getListaParametros().get(i).getVariable())
@@ -698,17 +769,33 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
               }
               else if (lista.get(i).variable && lista.get(i).par == clase_parametro.REF)
               {
-                generarCodigo(lista.get(i).listado.get(0));
+                if (lista.get(i).listado.size() > 0)
+                {
+                  generarCodigo(lista.get(i).listado.get(0));
+                  generarCodigo(lista.get(i).listado.get(1));
+                }
+                //generarCodigo("DRF");
+              }
+              else if (s1.getListaParametros().get(i).getParametro() == clase_parametro.REF)
+              {
+                if (lista.get(i).listado.size() > 0)
+                {
+                  generarCodigo(lista.get(i).listado.get(0));
+                }
               }
               else
               {
-                generarCodigo(lista.get(i).listado);
+                if (lista.get(i).listado.size() > 0)
+                {
+                  generarCodigo(lista.get(i).listado);
+                }
               }
             }
           }
         }
-        //OSF nivel l a 
-        generarCodigo("OSF " + peso + " " + nivel + " L" + s1.getDir() + ":");
+        //OSF nivel l a
+        generarCodigo("; Invocaci\u00f3n a " + s1.getNombre());
+        generarCodigo("OSF " + peso + " " + (nivel - s1.getNivel()) + " L" + s1.getDir());
       }
     jj_consume_token(49);
   }
@@ -719,7 +806,8 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
   String etqMQ, etqFIN;
     tk = jj_consume_token(tMQ);
       etqMQ = nueva_etiqueta();
-      generarCodigo(etqMQ);
+      generarCodigo(etqMQ + ":");
+      generarCodigo("; MQ");
     term = expresion(true);
       {
         if ((term.tipo != tipo_variable.DESCONOCIDO) && (term.tipo != tipo_variable.BOOLEANO))
@@ -736,11 +824,14 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
         generarCodigo(term.listado);
       }
       etqFIN = nueva_etiqueta();
+      generarCodigo("; Salir del bucle si la guarda se eval\u00faa a falso");
       generarCodigo("JMF " + etqFIN);
     lista_sentencias(true);
     jj_consume_token(tFMQ);
+      generarCodigo("; Fin de la iteraci\u00f3n. Saltar a la cabecera del bucle");
       generarCodigo("JMP " + etqMQ);
-      generarCodigo(etqFIN);
+      generarCodigo(etqFIN + ":");
+      generarCodigo("; Fin MQ");
     {if (true) return tk;}
     throw new Error("Missing return statement in function");
   }
@@ -756,6 +847,7 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
       {
         errorSemantico("La condici\u00f3n en el si debe ser un booleano [" + tk.beginLine + "," + tk.beginColumn + "] " + "Token: <" + tk.image + ">");
       }
+      generarCodigo("; SI");
       if (term.constante)
       { //warning o error
         errorSemantico("ERRORR");
@@ -767,6 +859,7 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
       etqSINO = nueva_etiqueta();
       generarCodigo("JMF " + etqSINO);
     jj_consume_token(tENT);
+      generarCodigo("; ENT");
     lista_sentencias(true);
     switch ((jj_ntk==-1)?jj_ntk():jj_ntk) {
     case tSI_NO:
@@ -774,9 +867,10 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
         sino = true;
         etqFIN = nueva_etiqueta();
         generarCodigo("JMP " + etqFIN);
-        generarCodigo(etqSINO);
+        generarCodigo(etqSINO + ":");
+        generarCodigo("; SI_NO");
       lista_sentencias(true);
-        generarCodigo(etqFIN);
+        generarCodigo(etqFIN + ":");
       break;
     default:
       jj_la1[15] = jj_gen;
@@ -787,6 +881,7 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
         generarCodigo(etqSINO);
       }
     jj_consume_token(tFSI);
+      generarCodigo("; Fin SI");
     {if (true) return tk;}
     throw new Error("Missing return statement in function");
   }
@@ -1285,7 +1380,7 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
     throw new Error("Missing return statement in function");
   }
 
-  static final public Token lista_escribibles(Token tk,boolean estado) throws ParseException {
+  static final public Token lista_escribibles(Token tk, boolean estado) throws ParseException {
   ArrayList < RegistroFactor > lista = null;
     lista = lista_expresiones(estado);
     for (int i = 0; i < lista.size(); i++)
@@ -1944,11 +2039,11 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
       }
       else if (tpAuxi.tipo == tipo_variable.ENTERO && tpAuxi.constante)
       {
-         tpFactor.constante = true;
+        tpFactor.constante = true;
         tpFactor.tipo = tipo_variable.CARACTER;
         tpFactor.valorChar = (char) tpAuxi.valorEnt;
-         tpFactor.variable = tpAuxi.variable;
-         tpFactor.listado = tpAuxi.listado;
+        tpFactor.variable = tpAuxi.variable;
+        tpFactor.listado = tpAuxi.listado;
       }
       else if (tpAuxi.tipo == tipo_variable.DESCONOCIDO || tpAuxi.tipo == tipo_variable.ENTERO)
       {
@@ -1975,7 +2070,7 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
       }
       else if (tpAuxi.tipo == tipo_variable.CARACTER && tpAuxi.constante)
       {
-          tpFactor.constante = true;
+        tpFactor.constante = true;
         tpFactor.tipo = tipo_variable.ENTERO;
         tpFactor.valorEnt = (int) tpAuxi.valorChar;
         tpFactor.variable = tpAuxi.variable;
@@ -1984,8 +2079,8 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
       else if (tpAuxi.tipo == tipo_variable.DESCONOCIDO || tpAuxi.tipo == tipo_variable.CARACTER)
       {
         tpFactor.tipo = tipo_variable.ENTERO;
-       tpFactor.variable = tpAuxi.variable;
-       tpFactor.listado = tpAuxi.listado;
+        tpFactor.variable = tpAuxi.variable;
+        tpFactor.listado = tpAuxi.listado;
       }
       else
       {
@@ -2016,6 +2111,10 @@ public class AnalsisLexico implements AnalsisLexicoConstants {
         {
           auxilar.add("SRF " + (nivel - s1.getNivel()) + " " + s1.getDir());
           auxilar.add("DRF");
+          if (tpFactor.par == clase_parametro.REF)
+          {
+            auxilar.add("DRF");
+          }
           tpFactor.listado = auxilar;
         }
       }

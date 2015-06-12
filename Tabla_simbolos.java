@@ -74,7 +74,7 @@ public class Tabla_simbolos {
 			clase_parametro parametro, int nivel, int dir) {
 		if (!table.existe(nombre, nivel)) {
 			Simbolo sim = new Simbolo();
-			sim.introducir_parametro(nombre, variable,parametro, nivel);
+			sim.introducir_parametro(nombre, variable,parametro, nivel,dir);
 			table.insertar(sim);
 			return sim;
 		}else{

@@ -26,12 +26,13 @@ public class Simbolo {
 	private long dir;
 	private RegistroFactor factor;
 	
-public void introducir_parametro(String nombre, tipo_variable variable,clase_parametro clase, int nivel ){
+public void introducir_parametro(String nombre, tipo_variable variable,clase_parametro clase, int nivel,int dir ){
 	this.nombre = nombre;
 	this.variable=variable;
 	this.parametro = clase;
 	this.nivel = nivel;
 	this.tipo = tipo_simbolo.PARAMETRO;
+	this.dir = dir;
 }
 
 
